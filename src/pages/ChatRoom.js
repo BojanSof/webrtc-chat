@@ -55,7 +55,9 @@ function ChatRoom() {
   }, [roomId, dispatch]);
 
   const initializeSocket = () => {
-    socketRef.current = io('http://localhost:4000');
+    socketRef.current = io('http://localhost:3001', {
+      withCredentials: true
+    });
 
     socketRef.current.on('connect', () => {
       console.log('Connected to signaling server with ID:', socketRef.current.id);

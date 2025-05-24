@@ -8,12 +8,16 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: ["http://localhost", "http://localhost:80"],
     methods: ['GET', 'POST'],
+    credentials: true
   },
 });
 
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost", "http://localhost:80"],
+  credentials: true
+}));
 app.use(express.json());
 
 // Store active rooms and their participants
