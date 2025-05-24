@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - signaling-server
+    networks:
+      - webrtc-network
+
+  signaling-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    networks:
+      - webrtc-network
+
+networks:
+  webrtc-network:
+    driver: bridge 

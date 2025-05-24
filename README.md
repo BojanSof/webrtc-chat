@@ -17,6 +17,8 @@ A real-time chat application built with React and WebRTC, featuring text messagi
 - WebRTC
 - Socket.io
 - Tailwind CSS
+- Docker
+- Nginx
 
 ## Getting Started
 
@@ -24,8 +26,9 @@ A real-time chat application built with React and WebRTC, featuring text messagi
 
 - Node.js (v14 or higher)
 - npm or yarn
+- Docker and Docker Compose (for containerized deployment)
 
-### Installation
+### Local Development
 
 1. Clone the repository:
 ```bash
@@ -56,6 +59,65 @@ npm start
 
 The application will be available at `http://localhost:3000`.
 
+### Docker Deployment
+
+#### Local Testing with Docker
+
+1. Make sure Docker and Docker Compose are installed on your system
+2. Build and start the containers:
+```bash
+docker-compose up --build
+```
+
+The application will be available at:
+- Client: `http://localhost`
+- Signaling Server: `http://localhost:3001`
+
+Useful Docker commands:
+```bash
+# Stop the containers
+docker-compose down
+
+# View logs
+docker-compose logs
+
+# View logs for a specific service
+docker-compose logs client
+docker-compose logs signaling-server
+
+# Rebuild and restart a specific service
+docker-compose up -d --build client
+docker-compose up -d --build signaling-server
+```
+
+#### Production Deployment
+
+1. Install Docker and Docker Compose on your server:
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Install Docker Compose
+apt-get update
+apt-get install docker-compose-plugin
+```
+
+2. Clone the repository on your server:
+```bash
+git clone https://github.com/yourusername/webrtc-chat.git
+cd webrtc-chat
+```
+
+3. Build and start the containers:
+```bash
+docker-compose up -d
+```
+
+The application will be available at:
+- Client: `http://your-server-ip`
+- Signaling Server: `http://your-server-ip:3001`
+
 ## Usage
 
 1. Open the application in your browser
@@ -75,7 +137,12 @@ webrtc-chat/
 │   ├── utils/          # Utility functions
 │   └── App.js          # Main application component
 ├── server/             # Signaling server
-└── package.json        # Project dependencies
+├── package.json        # Project dependencies
+├── Dockerfile          # Client Docker configuration
+├── server/Dockerfile   # Server Docker configuration
+├── docker-compose.yml  # Docker services orchestration
+└── nginx.conf          # Nginx configuration
+
 ```
 
 ## Contributing
