@@ -8,14 +8,14 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: ["http://localhost", "http://localhost:80"],
+    origin: true, // Allow all origins since we're behind nginx
     methods: ['GET', 'POST'],
     credentials: true
   },
 });
 
 app.use(cors({
-  origin: ["http://localhost", "http://localhost:80"],
+  origin: true, // Allow all origins since we're behind nginx
   credentials: true
 }));
 app.use(express.json());

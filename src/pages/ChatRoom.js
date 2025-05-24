@@ -55,7 +55,8 @@ function ChatRoom() {
   }, [roomId, dispatch]);
 
   const initializeSocket = () => {
-    socketRef.current = io('http://localhost:3001', {
+    socketRef.current = io('/', {
+      path: '/socket.io/',
       withCredentials: true
     });
 
