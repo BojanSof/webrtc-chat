@@ -57,7 +57,9 @@ function ChatRoom() {
   const initializeSocket = () => {
     socketRef.current = io('/', {
       path: '/socket.io/',
-      withCredentials: true
+      withCredentials: true,
+      secure: true,
+      rejectUnauthorized: false // Only use this in development
     });
 
     socketRef.current.on('connect', () => {
