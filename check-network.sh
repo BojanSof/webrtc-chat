@@ -31,8 +31,8 @@ curl -s https://api.ipify.org
 
 echo
 echo "=== DNS Resolution Check ==="
-echo "Checking DNS resolution for chatrix.xyz:"
-nslookup chatrix.xyz
+echo "Checking DNS resolution for www.chatrix.xyz:"
+nslookup www.chatrix.xyz
 
 echo
 echo "=== No-IP Client Status ==="

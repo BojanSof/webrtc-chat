@@ -118,6 +118,39 @@ The application will be available at:
 - Client: `http://your-server-ip`
 - Signaling Server: `http://your-server-ip:3001`
 
+### SSL Certificate Setup
+
+To enable HTTPS and secure WebSocket connections, follow these steps:
+
+1. Install Certbot (Let's Encrypt client):
+```bash
+sudo apt-get update
+sudo apt-get install certbot python3-certbot-nginx
+```
+
+2. Obtain SSL certificates for your domains:
+```bash
+sudo certbot --nginx -d www.chatrix.xyz -d bojansof.ddns.net
+```
+
+3. Certbot will automatically modify your Nginx configuration and set up automatic renewal.
+
+4. Test the automatic renewal:
+```bash
+sudo certbot renew --dry-run
+```
+
+5. The certificates will be automatically renewed every 90 days. You can verify the renewal schedule:
+```bash
+sudo certbot certificates
+```
+
+After setting up SSL certificates, your application will be available at:
+- Client: `https://www.chatrix.xyz`
+- Signaling Server: `https://www.chatrix.xyz:3001`
+
+Note: Make sure your domain's DNS is properly configured to point to your server's IP address before requesting SSL certificates.
+
 ## Usage
 
 1. Open the application in your browser
