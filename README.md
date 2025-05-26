@@ -1,4 +1,7 @@
-# WebRTC Chat Application
+<center>
+<img src="icon.png" width=128/>
+<h1>WebRTC Chat Application</h1>
+</center>
 
 A real-time chat application built with React and WebRTC, featuring text messaging and file sharing capabilities.
 
@@ -32,7 +35,7 @@ A real-time chat application built with React and WebRTC, featuring text messagi
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/webrtc-chat.git
+git clone https://github.com/BojanSof/webrtc-chat.git
 cd webrtc-chat
 ```
 
@@ -98,16 +101,18 @@ docker-compose up -d --build signaling-server
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
 
-# Install Docker Compose
+# Install Docker Compose (Debian-based distro)
 apt-get update
 apt-get install docker-compose-plugin
 ```
 
 2. Clone the repository on your server:
 ```bash
-git clone https://github.com/yourusername/webrtc-chat.git
+git clone https://github.com/BojanSof/webrtc-chat.git
 cd webrtc-chat
 ```
+
+3. Change the domains in `nginx.conf`
 
 3. Build and start the containers:
 ```bash
@@ -130,7 +135,7 @@ sudo apt-get install certbot python3-certbot-nginx
 
 2. Obtain SSL certificates for your domains:
 ```bash
-sudo certbot --nginx -d www.chatrix.xyz -d bojansof.ddns.net
+sudo certbot --nginx -d <domain>
 ```
 
 3. Certbot will automatically modify your Nginx configuration and set up automatic renewal.
@@ -146,8 +151,8 @@ sudo certbot certificates
 ```
 
 After setting up SSL certificates, your application will be available at:
-- Client: `https://www.chatrix.xyz`
-- Signaling Server: `https://www.chatrix.xyz:3001`
+- Client: `https://domain`
+- Signaling Server: `https://domain:3001`
 
 Note: Make sure your domain's DNS is properly configured to point to your server's IP address before requesting SSL certificates.
 
@@ -162,9 +167,9 @@ Note: Make sure your domain's DNS is properly configured to point to your server
 
 ```
 webrtc-chat/
-├── public/              # Static files
-├── src/                 # Source code
-│   ├── components/      # React components
+├── public/             # Static files
+├── src/                # Source code
+│   ├── components/     # React components
 │   ├── pages/          # Page components
 │   ├── store/          # Redux store
 │   ├── utils/          # Utility functions
