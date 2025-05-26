@@ -837,7 +837,7 @@ function ChatRoom() {
           </div>
 
           <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4">
-            <form onSubmit={handleSendMessage} className="flex space-x-4">
+            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
               <input
                 type="text"
                 value={message}
@@ -846,12 +846,12 @@ function ChatRoom() {
                   handleTyping();
                 }}
                 placeholder="Type a message..."
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current.click()}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="flex-shrink-0 p-2 text-gray-600 hover:text-gray-800"
               >
                 <svg
                   className="w-6 h-6"
@@ -875,7 +875,7 @@ function ChatRoom() {
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-shrink-0 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 whitespace-nowrap"
               >
                 Send
               </button>
