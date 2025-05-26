@@ -204,6 +204,9 @@ function ChatRoom() {
       ordered: true,
     });
 
+    // Set up flow control
+    dc.bufferedAmountLowThreshold = 256 * 1024; // 256KB threshold
+
     dc.onopen = () => {
       console.log('Data channel opened');
       dispatch(setConnectionStatus('connected'));
@@ -572,7 +575,7 @@ function ChatRoom() {
         })
       );
 
-      // Send file chunks
+      // Send file chunks with flow control
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
         const start = chunkIndex * chunkSize;
         const end = Math.min(start + chunkSize, file.size);
@@ -580,10 +583,17 @@ function ChatRoom() {
 
         const reader = new FileReader();
         await new Promise((resolve, reject) => {
-          reader.onload = () => {
+          reader.onload = async () => {
             try {
               // Convert the ArrayBuffer to base64 for transmission
               const base64Data = btoa(String.fromCharCode.apply(null, new Uint8Array(reader.result)));
+              
+              // Wait for the data channel to be ready to send
+              while (dataChannelRef.current.bufferedAmount > dataChannelRef.current.bufferedAmountLowThreshold) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+
+              // Send the chunk
               dataChannelRef.current.send(
                 JSON.stringify({
                   type: 'file',
@@ -594,6 +604,7 @@ function ChatRoom() {
                   data: base64Data,
                 })
               );
+
               const progress = ((chunkIndex + 1) / totalChunks) * 100;
               dispatch(addMessage({
                 id: fileId,
