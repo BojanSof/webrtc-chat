@@ -703,34 +703,34 @@ function ChatRoom() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-shrink-0 bg-white shadow sticky top-0 z-10">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">
-                Room: {roomId}
-              </h1>
-              <span
-                className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
-                  status === 'connected'
-                    ? 'bg-green-100 text-green-800'
-                    : status === 'connecting'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {status}
-              </span>
-            </div>
-            <button
-              onClick={() => navigate('/')}
-              className="text-gray-500 hover:text-gray-700"
+      <div className="flex-shrink-0 bg-white shadow fixed top-0 left-0 right-0 z-10">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center">
+            <h1 className="text-xl font-semibold text-gray-900">
+              Room: {roomId}
+            </h1>
+            <span
+              className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                status === 'connected'
+                  ? 'bg-green-100 text-green-800'
+                  : status === 'connecting'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-red-100 text-red-800'
+              }`}
             >
-              Leave Room
-            </button>
+              {status}
+            </span>
           </div>
+          <button
+            onClick={() => navigate('/')}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            Leave Room
+          </button>
         </div>
+      </div>
 
+      <div className="flex-1 overflow-hidden flex flex-col pt-16">
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-4">
             {messages.map((msg) => (
@@ -838,12 +838,18 @@ function ChatRoom() {
         <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4">
           <form onSubmit={(e) => {
             e.preventDefault();
-            handleSendMessage(e);
-            // Focus the input after sending to keep keyboard open
-            setTimeout(() => {
-              const input = e.target.querySelector('input[type="text"]');
-              if (input) input.focus();
-            }, 0);
+            if (message.trim() && dataChannelRef.current && isDataChannelReady) {
+              dataChannelRef.current.send(
+                JSON.stringify({
+                  type: 'message',
+                  text: message,
+                })
+              );
+              dispatch(addMessage({ text: message, sender: 'local' }));
+              setMessage('');
+              // Keep the input focused without setTimeout
+              e.target.querySelector('input[type="text"]')?.focus();
+            }
           }} className="flex items-center gap-2">
             <input
               type="text"
