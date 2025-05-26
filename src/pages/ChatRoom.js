@@ -39,6 +39,8 @@ function ChatRoom() {
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [receivedFiles, setReceivedFiles] = useState({});
   const [completedFiles, setCompletedFiles] = useState({});
+  const MAX_RECONNECT_ATTEMPTS = 3;
+  const RECONNECT_DELAY = 2000; // milliseconds
 
   const { status } = useSelector((state) => state.connection);
   const { messages, remoteTyping } = useSelector((state) => state.chat);
@@ -54,17 +56,43 @@ function ChatRoom() {
     };
   }, [roomId, dispatch]);
 
+  useEffect(() => {
+    if (status === 'disconnected' && connectionAttempt < MAX_RECONNECT_ATTEMPTS) {
+      const timer = setTimeout(() => {
+        console.log(`Attempting to reconnect (attempt ${connectionAttempt + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+        setConnectionAttempt(prev => prev + 1);
+        cleanup();
+        initializeSocket();
+      }, RECONNECT_DELAY);
+      return () => clearTimeout(timer);
+    }
+  }, [status, connectionAttempt]);
+
   const initializeSocket = () => {
     socketRef.current = io('/', {
       path: '/socket.io/',
       withCredentials: true,
       secure: true,
-      rejectUnauthorized: false // Only use this in development
+      reconnection: true,
+      reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
+      reconnectionDelay: RECONNECT_DELAY,
+      timeout: 10000
     });
 
     socketRef.current.on('connect', () => {
       console.log('Connected to signaling server with ID:', socketRef.current.id);
       socketRef.current.emit('join-room', roomId);
+      setConnectionAttempt(0); // Reset connection attempt counter on successful connection
+    });
+
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      dispatch(setConnectionStatus('disconnected'));
+    });
+
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      dispatch(setConnectionStatus('disconnected'));
     });
 
     socketRef.current.on('room-joined', ({ roomId, socketId }) => {
@@ -115,6 +143,9 @@ function ChatRoom() {
         },
       ],
       iceCandidatePoolSize: 10,
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
     });
 
     pc.onicecandidate = (event) => {
@@ -645,6 +676,22 @@ function ChatRoom() {
     setIsDataChannelReady(false);
     setIsHandlingOffer(false);
   };
+
+  // Add a function to handle page visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && status === 'disconnected') {
+        console.log('Page became visible, attempting to reconnect...');
+        cleanup();
+        initializeSocket();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [status]);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
