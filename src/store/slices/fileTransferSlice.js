@@ -43,7 +43,8 @@ const fileTransferSlice = createSlice({
     },
     clearTransfers: (state) => {
       state.activeTransfers = {};
-      state.completedTransfers = {};
+      // Don't clear completed transfers to preserve download history
+      // state.completedTransfers = {};
     },
   },
 });

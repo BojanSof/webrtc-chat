@@ -671,7 +671,6 @@ function ChatRoom() {
       dataChannelRef.current.close();
     }
     dispatch(resetConnection());
-    dispatch(clearMessages());
     dispatch(clearTransfers());
     setIsDataChannelReady(false);
     setIsHandlingOffer(false);
@@ -703,7 +702,7 @@ function ChatRoom() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
-      <div className="flex-shrink-0 bg-white shadow fixed top-0 left-0 right-0 z-10">
+      <div className="flex-shrink-0 bg-white shadow absolute top-0 left-0 right-0 z-10">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
             <h1 className="text-xl font-semibold text-gray-900">
@@ -730,7 +729,7 @@ function ChatRoom() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col pt-16">
+      <div className="flex flex-col h-full pt-16">
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-4">
             {messages.map((msg) => (
