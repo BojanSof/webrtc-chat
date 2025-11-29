@@ -31,6 +31,7 @@ services:
   turn-server:
     image: coturn/coturn:4.5.2
     restart: unless-stopped
+    user: root
     command: >
       /bin/sh -c "
         EXTRA_ARGS='';
