@@ -37,6 +37,7 @@ services:
         if [ -n \"${TURN_EXTERNAL_IP}\" ]; then
           EXTRA_ARGS=\"--external-ip ${TURN_EXTERNAL_IP}\";
         fi;
+        mkdir -p /var/lib/turnserver &&
         turnserver
           --listening-port ${TURN_PORT:-3478}
           --tls-listening-port ${TURN_TLS_PORT:-5349}
@@ -51,7 +52,7 @@ services:
           --no-loopback-peers
           --no-tlsv1
           --no-tlsv1_1
-          --pidfile /var/tmp/turnserver.pid
+          --pidfile /var/lib/turnserver/turnserver.pid
           --verbose
           $$EXTRA_ARGS
       "
