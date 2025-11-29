@@ -20,8 +20,11 @@ import {
   failTransfer,
   clearTransfers,
 } from '../store/slices/fileTransferSlice';
+import { ICE_SERVERS } from '../utils/webrtcConfig';
 
 const CHUNK_SIZE = 16 * 1024; // 16KB chunks
+const MAX_ICE_RESTART_ATTEMPTS = 3;
+const ICE_RESTART_COOLDOWN_MS = 3000;
 
 function ChatRoom() {
   const { roomId } = useParams();
@@ -31,11 +34,14 @@ function ChatRoom() {
   const peerConnectionRef = useRef();
   const dataChannelRef = useRef();
   const fileInputRef = useRef();
+  const iceRestartAttemptsRef = useRef(0);
+  const lastIceRestartRef = useRef(0);
   const [message, setMessage] = useState('');
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [isDataChannelReady, setIsDataChannelReady] = useState(false);
   const [isHandlingOffer, setIsHandlingOffer] = useState(false);
   const [isOfferer, setIsOfferer] = useState(false);
+  const isOffererRef = useRef(false);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [receivedFiles, setReceivedFiles] = useState({});
   const [completedFiles, setCompletedFiles] = useState({});
@@ -55,6 +61,10 @@ function ChatRoom() {
       cleanup();
     };
   }, [roomId, dispatch]);
+
+  useEffect(() => {
+    isOffererRef.current = isOfferer;
+  }, [isOfferer]);
 
   useEffect(() => {
     if (status === 'disconnected' && connectionAttempt < MAX_RECONNECT_ATTEMPTS) {
@@ -126,22 +136,58 @@ function ChatRoom() {
       console.log(`Received ICE candidate from ${from}`);
       handleReceiveIceCandidate(candidate);
     });
+
+    socketRef.current.on('request-ice-restart', ({ from }) => {
+      console.log(`Received ICE restart request from ${from}`);
+      if (isOffererRef.current) {
+        createOffer({ iceRestart: true });
+      } else {
+        console.log('Ignoring ICE restart request because this peer is the answerer');
+      }
+    });
+  };
+
+  const resetIceRestartState = () => {
+    iceRestartAttemptsRef.current = 0;
+    lastIceRestartRef.current = 0;
+  };
+
+  const attemptIceRestart = (reason) => {
+    if (!socketRef.current || !peerConnectionRef.current) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastIceRestartRef.current < ICE_RESTART_COOLDOWN_MS) {
+      console.log('Skipping ICE restart - cooldown active');
+      return;
+    }
+
+    if (iceRestartAttemptsRef.current >= MAX_ICE_RESTART_ATTEMPTS) {
+      console.warn('Maximum ICE restart attempts reached');
+      return;
+    }
+
+    lastIceRestartRef.current = now;
+    iceRestartAttemptsRef.current += 1;
+
+    if (isOffererRef.current) {
+      console.log(`Attempting ICE restart as offerer due to ${reason}`);
+      createOffer({ iceRestart: true });
+    } else {
+      console.log(`Requesting ICE restart from offerer due to ${reason}`);
+      socketRef.current.emit('request-ice-restart', {
+        roomId,
+        from: socketRef.current.id,
+      });
+    }
   };
 
   const createPeerConnection = () => {
     console.log('Creating peer connection');
+    console.log('Using ICE servers:', ICE_SERVERS);
     const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: [
-            'stun:stun.l.google.com:19302',
-            'stun:stun1.l.google.com:19302',
-            'stun:stun2.l.google.com:19302',
-            'stun:stun3.l.google.com:19302',
-            'stun:stun4.l.google.com:19302',
-          ],
-        },
-      ],
+      iceServers: ICE_SERVERS,
       iceCandidatePoolSize: 10,
       iceTransportPolicy: 'all',
       bundlePolicy: 'max-bundle',
@@ -172,6 +218,7 @@ function ChatRoom() {
         console.log('Data channel opened');
         dispatch(setConnectionStatus('connected'));
         setIsDataChannelReady(true);
+        resetIceRestartState();
       };
       dc.onclose = () => {
         console.log('Data channel closed');
@@ -188,10 +235,22 @@ function ChatRoom() {
     pc.onconnectionstatechange = () => {
       console.log('Peer connection state changed:', pc.connectionState);
       dispatch(setConnectionStatus(pc.connectionState));
+      if (pc.connectionState === 'connected') {
+        resetIceRestartState();
+      }
+      if (pc.connectionState === 'failed') {
+        attemptIceRestart('peer connection failed');
+      }
     };
 
     pc.oniceconnectionstatechange = () => {
       console.log('ICE connection state changed:', pc.iceConnectionState);
+      if (
+        pc.iceConnectionState === 'disconnected' ||
+        pc.iceConnectionState === 'failed'
+      ) {
+        attemptIceRestart(`ICE connection ${pc.iceConnectionState}`);
+      }
     };
 
     peerConnectionRef.current = pc;
@@ -211,6 +270,7 @@ function ChatRoom() {
       console.log('Data channel opened');
       dispatch(setConnectionStatus('connected'));
       setIsDataChannelReady(true);
+      resetIceRestartState();
     };
 
     dc.onclose = () => {
@@ -228,20 +288,26 @@ function ChatRoom() {
     dataChannelRef.current = dc;
   };
 
-  const createOffer = async () => {
+  const createOffer = async ({ iceRestart = false } = {}) => {
     if (isHandlingOffer) {
       console.log('Skipping offer creation - already handling a remote offer');
       return;
     }
 
     try {
-      // Create data channel before creating offer
-      createDataChannel(peerConnectionRef.current);
+      // Create data channel before creating offer when needed
+      if (
+        !dataChannelRef.current ||
+        dataChannelRef.current.readyState === 'closed'
+      ) {
+        createDataChannel(peerConnectionRef.current);
+      }
       
       console.log('Creating offer');
       const offer = await peerConnectionRef.current.createOffer({
         offerToReceiveAudio: false,
         offerToReceiveVideo: false,
+        iceRestart,
       });
       console.log('Setting local description');
       await peerConnectionRef.current.setLocalDescription(offer);
@@ -685,6 +751,7 @@ function ChatRoom() {
     dispatch(clearTransfers());
     setIsDataChannelReady(false);
     setIsHandlingOffer(false);
+    resetIceRestartState();
   };
 
   // Add a function to handle page visibility changes

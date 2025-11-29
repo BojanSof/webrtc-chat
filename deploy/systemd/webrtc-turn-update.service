@@ -1,0 +1,7 @@
+[Unit]
+Description=Refresh TURN server with latest DDNS IP
+WorkingDirectory=/home/bojan/webrtc-chat
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -lc './scripts/start-with-turn.sh up -d turn-server'

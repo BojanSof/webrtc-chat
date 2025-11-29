@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically refresh TURN server external IP
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
