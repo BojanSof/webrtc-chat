@@ -3,6 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - REACT_APP_STUN_URLS=${REACT_APP_STUN_URLS}
+        - REACT_APP_TURN_URLS=${REACT_APP_TURN_URLS}
+        - REACT_APP_TURN_USERNAME=${REACT_APP_TURN_USERNAME}
+        - REACT_APP_TURN_PASSWORD=${REACT_APP_TURN_PASSWORD}
     ports:
       - "80:80"
       - "443:443"
@@ -10,6 +15,7 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - signaling-server
+      - turn-server
     networks:
       - webrtc-network
 
@@ -22,6 +28,40 @@ services:
     networks:
       - webrtc-network
 
+  turn-server:
+    image: coturn/coturn:4.5.2
+    restart: unless-stopped
+    command: >
+      /bin/sh -c "
+        EXTRA_ARGS='';
+        if [ -n \"${TURN_EXTERNAL_IP}\" ]; then
+          EXTRA_ARGS=\"--external-ip ${TURN_EXTERNAL_IP}\";
+        fi;
+        turnserver
+          --listening-port ${TURN_PORT:-3478}
+          --tls-listening-port ${TURN_TLS_PORT:-5349}
+          --realm ${TURN_REALM:-webrtc-chat.local}
+          --fingerprint
+          --lt-cred-mech
+          --user ${TURN_USERNAME:-webrtc-user}:${TURN_PASSWORD:-change-me}
+          --total-quota=100
+          --bps-capacity=0
+          --stale-nonce
+          --no-multicast-peers
+          --no-loopback-peers
+          --no-tlsv1
+          --no-tlsv1_1
+          --verbose
+          $$EXTRA_ARGS
+      "
+    ports:
+      - "${TURN_PORT:-3478}:${TURN_PORT:-3478}"
+      - "${TURN_PORT:-3478}:${TURN_PORT:-3478}/udp"
+      - "${TURN_TLS_PORT:-5349}:${TURN_TLS_PORT:-5349}"
+      - "${TURN_TLS_PORT:-5349}:${TURN_TLS_PORT:-5349}/udp"
+    networks:
+      - webrtc-network
+
 networks:
   webrtc-network:
-    driver: bridge 
+    driver: bridge
