@@ -51,6 +51,7 @@ services:
           --no-loopback-peers
           --no-tlsv1
           --no-tlsv1_1
+          --pidfile /var/tmp/turnserver.pid
           --verbose
           $$EXTRA_ARGS
       "
