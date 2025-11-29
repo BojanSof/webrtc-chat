@@ -188,6 +188,28 @@ Key environment variables:
 - `TURN_REALM`: logical realm reported to clients (helps separate deployments).
 - `TURN_EXTERNAL_IP`: required when the Docker host is behind NAT so coturn can relay the correct public IP. If you only know a DDNS hostname, set `TURN_DDNS_HOST` and call `./scripts/start-with-turn.sh ...` to resolve it automatically before launching Docker Compose.
 - `TURN_DDNS_HOST`: optional DDNS hostname; the helper script resolves it via `dig +short`. Install `dnsutils`/`bind-utils` so `dig` is available.
+
+#### Keeping TURN up-to-date with DDNS
+
+If your public IP changes frequently, use a systemd timer to rerun the helper script on a schedule:
+
+1. Copy the sample units:
+   ```bash
+   sudo cp deploy/systemd/webrtc-turn-update.* /etc/systemd/system/
+   ```
+2. Edit `/etc/systemd/system/webrtc-turn-update.service` if your repository path differs from `/home/bojan/webrtc-chat`.
+3. Reload systemd and enable the timer:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now webrtc-turn-update.timer
+   ```
+4. Verify it’s running:
+   ```bash
+   systemctl list-timers | grep webrtc-turn-update
+   journalctl -u webrtc-turn-update.service
+   ```
+
+The timer calls `./scripts/start-with-turn.sh up -d turn-server` every five minutes (configurable via `OnUnitActiveSec`), ensuring coturn always advertises the current DDNS-resolved IP.
 - `REACT_APP_STUN_URLS`: comma-separated STUN URLs rendered into the client build.
 - `REACT_APP_TURN_URLS`, `REACT_APP_TURN_USERNAME`, `REACT_APP_TURN_PASSWORD`: TURN entries bundled with the client so browsers can authenticate.
 
