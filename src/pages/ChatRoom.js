@@ -818,7 +818,7 @@ function ChatRoom() {
                 }`}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
                     msg.sender === 'local'
                       ? 'bg-primary-600 text-white'
                       : 'bg-white text-gray-900'
@@ -843,7 +843,7 @@ function ChatRoom() {
                           />
                         </svg>
                         <div className="flex flex-col">
-                          <span className={`font-medium ${
+                          <span className={`font-medium break-words ${
                             msg.sender === 'local' ? 'text-white' : 'text-gray-900'
                           }`}>
                             {msg.fileName}
@@ -896,7 +896,9 @@ function ChatRoom() {
                       )}
                     </div>
                   ) : (
-                    <span>{msg.text}</span>
+                    <span className="break-words whitespace-pre-wrap">
+                      {msg.text}
+                    </span>
                   )}
                 </div>
               </div>
