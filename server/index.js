@@ -76,6 +76,11 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('ice-candidate', { candidate, from });
   });
 
+  socket.on('request-ice-restart', ({ roomId, from }) => {
+    console.log(`ICE restart requested by ${from} in room ${roomId}`);
+    socket.to(roomId).emit('request-ice-restart', { from });
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
     
