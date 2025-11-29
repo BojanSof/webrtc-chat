@@ -31,6 +31,8 @@ services:
   turn-server:
     image: coturn/coturn:4.5.2
     restart: unless-stopped
+    volumes:
+      - ./turn-data:/var/lib/coturn
     command: >
       /bin/sh -c "
         EXTRA_ARGS='';
@@ -51,7 +53,7 @@ services:
           --no-loopback-peers
           --no-tlsv1
           --no-tlsv1_1
-          --pidfile /tmp/turnserver.pid
+          --pidfile /var/lib/coturn/turnserver.pid
           --verbose
           $$EXTRA_ARGS
       "
