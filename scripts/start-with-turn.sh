@@ -17,18 +17,15 @@ set +a
 if [ -n "${TURN_EXTERNAL_IP:-}" ]; then
   RESOLVED_IP="$TURN_EXTERNAL_IP"
 elif [ -n "${TURN_DDNS_HOST:-}" ]; then
-  RESOLVED_IP=$(node -e "
-const dns = require('dns').promises;
-(async () => {
-  try {
-    const { address } = await dns.lookup(process.argv[1], { family: 4 });
-    console.log(address);
-  } catch (err) {
-    console.error('Failed to resolve host:', err.message);
-    process.exit(1);
-  }
-})();
-" "$TURN_DDNS_HOST")
+  if ! command -v dig >/dev/null 2>&1; then
+    echo "'dig' command is required to resolve TURN_DDNS_HOST. Install dnsutils/bind-utils." >&2
+    exit 1
+  fi
+  RESOLVED_IP=$(dig +short "$TURN_DDNS_HOST" | tail -n1)
+  if [ -z "$RESOLVED_IP" ]; then
+    echo "Failed to resolve TURN_DDNS_HOST ($TURN_DDNS_HOST) to an IP address." >&2
+    exit 1
+  fi
 else
   {
     echo "Neither TURN_EXTERNAL_IP nor TURN_DDNS_HOST is set in $ENV_FILE." >&2

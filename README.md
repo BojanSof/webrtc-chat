@@ -66,7 +66,7 @@ npm start
 ```
 
 6. (Optional) Start the TURN server locally via Docker (requires the `.env` file to be populated).  
-   If you rely on a dynamic DNS hostname, set `TURN_DDNS_HOST` in `.env` and run:
+   If you rely on a dynamic DNS hostname, set `TURN_DDNS_HOST` in `.env` and run (requires `dig` from dnsutils/bind-utils):
 ```bash
 ./scripts/start-with-turn.sh up turn-server
 ```
@@ -79,7 +79,7 @@ The application will be available at `http://localhost:3000`.
 
 1. Make sure Docker and Docker Compose are installed on your system
 2. Copy `.env.example` to `.env` and customize TURN/STUN credentials
-3. Build and start the containers (the helper script keeps `TURN_EXTERNAL_IP` in sync with your DDNS hostname):
+3. Build and start the containers (the helper script keeps `TURN_EXTERNAL_IP` in sync with your DDNS hostname; make sure `dig` is installed):
 ```bash
 ./scripts/start-with-turn.sh up --build
 ```
@@ -130,7 +130,7 @@ cd webrtc-chat
 
 4. Copy `.env.example` to `.env`, set the TURN credentials, and set `TURN_EXTERNAL_IP` to the server's public IP
 
-5. Build and start the containers (or use any other docker compose command through the helper script):
+5. Build and start the containers (or use any other docker compose command through the helper script; make sure `dig` exists on the host):
 ```bash
 ./scripts/start-with-turn.sh up -d
 ```
@@ -187,6 +187,7 @@ Key environment variables:
 - `TURN_USERNAME` / `TURN_PASSWORD`: credentials validated by coturn (`lt-cred-mech`).
 - `TURN_REALM`: logical realm reported to clients (helps separate deployments).
 - `TURN_EXTERNAL_IP`: required when the Docker host is behind NAT so coturn can relay the correct public IP. If you only know a DDNS hostname, set `TURN_DDNS_HOST` and call `./scripts/start-with-turn.sh ...` to resolve it automatically before launching Docker Compose.
+- `TURN_DDNS_HOST`: optional DDNS hostname; the helper script resolves it via `dig +short`. Install `dnsutils`/`bind-utils` so `dig` is available.
 - `REACT_APP_STUN_URLS`: comma-separated STUN URLs rendered into the client build.
 - `REACT_APP_TURN_URLS`, `REACT_APP_TURN_USERNAME`, `REACT_APP_TURN_PASSWORD`: TURN entries bundled with the client so browsers can authenticate.
 
