@@ -17,7 +17,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-acme:/acme
     environment:
-      DOCKER_API_VERSION: "1.44"
+      - DOCKER_API_VERSION=1.44
     networks:
       - traefik-proxy
 
