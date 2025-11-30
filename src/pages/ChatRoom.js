@@ -53,6 +53,7 @@ function ChatRoom() {
   const { activeTransfers, completedTransfers } = useSelector(
     (state) => state.fileTransfer
   );
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     dispatch(setRoomId(roomId));
@@ -725,16 +726,20 @@ function ChatRoom() {
     }
   };
 
+  const triggerDownload = (url, fileName) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const handleDownload = (fileId) => {
     const message = messages.find(msg => msg.id === fileId);
     if (!message || !message.url) return;
 
-    const a = document.createElement('a');
-    a.href = message.url;
-    a.download = message.fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    triggerDownload(message.url, message.fileName);
   };
 
   const cleanup = () => {
@@ -869,12 +874,31 @@ function ChatRoom() {
                           )}
                         </div>
                       </div>
-                      {msg.status === 'complete' && (
-                        <button
-                          onClick={() => handleDownload(msg.id)}
-                          className={`mt-2 text-sm flex items-center space-x-1 ${
-                            msg.sender === 'local'
-                              ? 'text-white hover:text-gray-200'
+                          {msg.status === 'complete' && msg.url && msg.fileType?.startsWith('image/') && (
+                            <div
+                              className={`mt-3 rounded-lg overflow-hidden ${
+                                msg.sender === 'local' ? 'bg-white/10' : 'bg-gray-100'
+                              }`}
+                            >
+                              <img
+                                src={msg.url}
+                                alt={msg.fileName}
+                                className="max-h-64 w-full object-contain cursor-pointer bg-white"
+                                onClick={() =>
+                                  setPreviewImage({
+                                    url: msg.url,
+                                    name: msg.fileName,
+                                  })
+                                }
+                              />
+                            </div>
+                          )}
+                          {msg.status === 'complete' && (
+                            <button
+                              onClick={() => handleDownload(msg.id)}
+                              className={`mt-2 text-sm flex items-center space-x-1 ${
+                                msg.sender === 'local'
+                                  ? 'text-white hover:text-gray-200'
                               : 'text-primary-600 hover:text-primary-800'
                           }`}
                         >
@@ -974,6 +998,44 @@ function ChatRoom() {
           </form>
         </div>
       </div>
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-h-full max-w-4xl w-full bg-white rounded-lg shadow-xl p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-900"
+              onClick={() => setPreviewImage(null)}
+              aria-label="Close preview"
+            >
+              ✕
+            </button>
+            <div className="flex flex-col space-y-3">
+              <span className="text-sm font-medium text-gray-700 break-words">
+                {previewImage.name}
+              </span>
+              <img
+                src={previewImage.url}
+                alt={previewImage.name}
+                className="max-h-[70vh] w-full object-contain rounded-md bg-gray-100"
+              />
+              <button
+                onClick={() =>
+                  triggerDownload(previewImage.url, previewImage.name)
+                }
+                className="self-start text-primary-600 hover:text-primary-800 text-sm"
+              >
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
