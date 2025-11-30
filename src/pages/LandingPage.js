@@ -19,7 +19,7 @@ function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 dark:bg-gray-900">
+    <div className="relative min-h-screen flex items-center justify-center bg-gray-100 px-4 dark:bg-gray-900">
       <div className="relative max-w-md w-full space-y-6 px-8 pt-6 pb-8 bg-white rounded-xl shadow-lg dark:bg-gray-800 dark:text-gray-100">
         <div className="absolute top-4 right-4">
           <ThemeToggle className="shadow-none bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600" />
@@ -81,6 +81,14 @@ function LandingPage() {
           </form>
         </div>
       </div>
+      <a
+        href="https://github.com/BojanSof/webrtc-chat"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute bottom-4 left-4 text-xs text-gray-500 hover:text-primary-600 dark:text-gray-400"
+      >
+        View on GitHub
+      </a>
     </div>
   );
 }
