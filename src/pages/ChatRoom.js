@@ -21,6 +21,7 @@ import {
   clearTransfers,
 } from '../store/slices/fileTransferSlice';
 import { ICE_SERVERS } from '../utils/webrtcConfig';
+import ThemeToggle from '../components/ThemeToggle';
 
 const CHUNK_SIZE = 16 * 1024; // 16KB chunks
 const MAX_ICE_RESTART_ATTEMPTS = 3;
@@ -867,7 +868,7 @@ function ChatRoom() {
 
   return (
     <div
-      className="flex flex-col h-screen bg-gray-100"
+      className="flex flex-col h-screen bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -881,30 +882,33 @@ function ChatRoom() {
           </div>
         </div>
       )}
-      <div className="flex-shrink-0 bg-white shadow absolute top-0 left-0 right-0 z-10">
+      <div className="flex-shrink-0 bg-white shadow absolute top-0 left-0 right-0 z-10 dark:bg-gray-800 dark:shadow-black/40">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
-            <h1 className="text-xl font-semibold text-gray-900">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
               Room: {roomId}
             </h1>
             <span
               className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
                 status === 'connected'
-                  ? 'bg-green-100 text-green-800'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                   : status === 'connecting'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
+                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
               }`}
             >
               {status}
             </span>
           </div>
-          <button
-            onClick={handleLeaveRoom}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            Leave Room
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle className="bg-gray-200/80 text-gray-700 shadow-none hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600" />
+            <button
+              onClick={handleLeaveRoom}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
+            >
+              Leave Room
+            </button>
+          </div>
         </div>
       </div>
 
@@ -919,10 +923,10 @@ function ChatRoom() {
                 }`}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg break-words whitespace-pre-wrap ${
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg break-words whitespace-pre-wrap transition-colors ${
                     msg.sender === 'local'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-white text-gray-900'
+                      ? 'bg-primary-600 text-white dark:bg-primary-500'
+                      : 'bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100'
                   }`}
                 >
                   {msg.type === 'file' ? (
@@ -944,27 +948,43 @@ function ChatRoom() {
                           />
                         </svg>
                         <div className="flex flex-col">
-                          <span className={`font-medium break-words ${
-                            msg.sender === 'local' ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <span
+                            className={`font-medium break-words ${
+                              msg.sender === 'local'
+                                ? 'text-white'
+                                : 'text-gray-900 dark:text-gray-100'
+                            }`}
+                          >
                             {msg.fileName}
                           </span>
-                          <span className={`text-sm ${
-                            msg.sender === 'local' ? 'text-gray-200' : 'text-gray-500'
-                          }`}>
+                          <span
+                            className={`text-sm ${
+                              msg.sender === 'local'
+                                ? 'text-gray-200'
+                                : 'text-gray-500 dark:text-gray-300'
+                            }`}
+                          >
                             {formatFileSize(msg.size || 0)}
                           </span>
                           {msg.status === 'sending' && (
-                            <span className={`text-sm ${
-                              msg.sender === 'local' ? 'text-gray-200' : 'text-gray-500'
-                            }`}>
+                            <span
+                              className={`text-sm ${
+                                msg.sender === 'local'
+                                  ? 'text-gray-200'
+                                  : 'text-gray-500 dark:text-gray-300'
+                              }`}
+                            >
                               Sending... {Math.round(msg.progress || 0)}%
                             </span>
                           )}
                           {msg.status === 'receiving' && (
-                            <span className={`text-sm ${
-                              msg.sender === 'local' ? 'text-gray-200' : 'text-gray-500'
-                            }`}>
+                            <span
+                              className={`text-sm ${
+                                msg.sender === 'local'
+                                  ? 'text-gray-200'
+                                  : 'text-gray-500 dark:text-gray-300'
+                              }`}
+                            >
                               Receiving... {Math.round(msg.progress || 0)}%
                             </span>
                           )}
@@ -973,7 +993,9 @@ function ChatRoom() {
                           {msg.status === 'complete' && msg.url && msg.fileType?.startsWith('image/') && (
                             <div
                               className={`mt-3 rounded-lg overflow-hidden ${
-                                msg.sender === 'local' ? 'bg-white/10' : 'bg-gray-100'
+                                msg.sender === 'local'
+                                  ? 'bg-white/10 dark:bg-white/20'
+                                  : 'bg-gray-100 dark:bg-gray-700'
                               }`}
                             >
                               <img
@@ -995,9 +1017,9 @@ function ChatRoom() {
                               className={`mt-2 text-sm flex items-center space-x-1 ${
                                 msg.sender === 'local'
                                   ? 'text-white hover:text-gray-200'
-                              : 'text-primary-600 hover:text-primary-800'
-                          }`}
-                        >
+                                  : 'text-primary-600 hover:text-primary-800 dark:text-primary-300 dark:hover:text-primary-200'
+                              }`}
+                            >
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -1026,7 +1048,7 @@ function ChatRoom() {
             
             {remoteTyping && (
               <div className="flex justify-start">
-                <div className="bg-white text-gray-500 px-4 py-2 rounded-lg">
+                <div className="bg-white text-gray-500 px-4 py-2 rounded-lg dark:bg-gray-800 dark:text-gray-300">
                   Typing...
                 </div>
               </div>
@@ -1034,7 +1056,7 @@ function ChatRoom() {
           </div>
         </div>
 
-        <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4">
+        <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
           <form onSubmit={(e) => {
             e.preventDefault();
             if (message.trim() && dataChannelRef.current && isDataChannelReady) {
@@ -1058,12 +1080,12 @@ function ChatRoom() {
                 handleTyping();
               }}
               placeholder="Type a message..."
-              className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400"
             />
             <button
               type="button"
               onClick={() => fileInputRef.current.click()}
-              className="flex-shrink-0 p-2 text-gray-600 hover:text-gray-800"
+              className="flex-shrink-0 p-2 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
             >
               <svg
                 className="w-6 h-6"
@@ -1101,30 +1123,30 @@ function ChatRoom() {
           onClick={() => setPreviewImage(null)}
         >
           <div
-            className="relative max-h-full max-w-4xl w-full bg-white rounded-lg shadow-xl p-4"
+            className="relative max-h-full max-w-4xl w-full bg-white rounded-lg shadow-xl p-4 dark:bg-gray-900"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="absolute top-3 right-3 text-gray-600 hover:text-gray-900"
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
               onClick={() => setPreviewImage(null)}
               aria-label="Close preview"
             >
               ✕
             </button>
             <div className="flex flex-col space-y-3">
-              <span className="text-sm font-medium text-gray-700 break-words">
+              <span className="text-sm font-medium text-gray-700 break-words dark:text-gray-200">
                 {previewImage.name}
               </span>
               <img
                 src={previewImage.url}
                 alt={previewImage.name}
-                className="max-h-[70vh] w-full object-contain rounded-md bg-gray-100"
+                className="max-h-[70vh] w-full object-contain rounded-md bg-gray-100 dark:bg-gray-800"
               />
               <button
                 onClick={() =>
                   triggerDownload(previewImage.url, previewImage.name)
                 }
-                className="self-start text-primary-600 hover:text-primary-800 text-sm"
+                className="self-start text-primary-600 hover:text-primary-800 text-sm dark:text-primary-300 dark:hover:text-primary-200"
               >
                 Download
               </button>
