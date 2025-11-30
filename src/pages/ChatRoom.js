@@ -816,9 +816,19 @@ function ChatRoom() {
     }
     dispatch(resetConnection());
     dispatch(clearTransfers());
+    dispatch(clearMessages());
+    dispatch(setRemoteTyping(false));
     setIsDataChannelReady(false);
     setIsHandlingOffer(false);
+    setMessage('');
+    setIsDraggingFile(false);
+    setPreviewImage(null);
     resetIceRestartState();
+  };
+
+  const handleLeaveRoom = () => {
+    cleanup();
+    navigate('/');
   };
 
   // Add a function to handle page visibility changes
@@ -880,7 +890,7 @@ function ChatRoom() {
             </span>
           </div>
           <button
-            onClick={() => navigate('/')}
+            onClick={handleLeaveRoom}
             className="text-gray-500 hover:text-gray-700"
           >
             Leave Room
