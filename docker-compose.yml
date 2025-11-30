@@ -1,4 +1,26 @@
 services:
+  traefik:
+    image: traefik:v3.6.2
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/acme/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-acme:/acme
+    environment:
+      - DOCKER_API_VERSION=1.44
+    networks:
+      - traefik-proxy
+
   client:
     build:
       context: .
@@ -8,16 +30,23 @@ services:
         - REACT_APP_TURN_URLS=${REACT_APP_TURN_URLS}
         - REACT_APP_TURN_USERNAME=${REACT_APP_TURN_USERNAME}
         - REACT_APP_TURN_PASSWORD=${REACT_APP_TURN_PASSWORD}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - signaling-server
       - turn-server
     networks:
       - webrtc-network
+      - traefik-proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=webrtc-traefik-proxy
+      - traefik.http.services.client.loadbalancer.server.port=80
+      - traefik.http.routers.client-web.rule=${TRAEFIK_HOST_RULE}
+      - traefik.http.routers.client-web.entrypoints=web
+      - traefik.http.routers.client-web.middlewares=redirect-to-https@docker
+      - traefik.http.routers.client-websecure.rule=${TRAEFIK_HOST_RULE}
+      - traefik.http.routers.client-websecure.entrypoints=websecure
+      - traefik.http.routers.client-websecure.tls.certresolver=letsencrypt
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
 
   signaling-server:
     build:
@@ -67,3 +96,9 @@ services:
 networks:
   webrtc-network:
     driver: bridge
+  traefik-proxy:
+    driver: bridge
+    name: webrtc-traefik-proxy
+
+volumes:
+  traefik-acme:

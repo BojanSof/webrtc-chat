@@ -127,7 +127,7 @@ git clone https://github.com/BojanSof/webrtc-chat.git
 cd webrtc-chat
 ```
 
-3. Change the domains in `nginx.conf`
+3. Change the domains in `nginx.conf` and update `TRAEFIK_HOST_RULE` in `.env` to match
 
 4. Copy `.env.example` to `.env`, set the TURN credentials, and set `TURN_EXTERNAL_IP` to the server's public IP
 
@@ -141,37 +141,27 @@ The application will be available at:
 - Signaling Server: `http://your-server-ip:3001`
 - TURN Server: `turn:your-server-ip:3478`
 
-### SSL Certificate Setup
+### HTTPS & Automatic TLS Certificates
 
-To enable HTTPS and secure WebSocket connections, follow these steps:
+Traefik now terminates TLS for the stack and obtains/renews Let's Encrypt certificates automatically. To enable HTTPS:
 
-1. Install Certbot (Let's Encrypt client):
-```bash
-sudo apt-get update
-sudo apt-get install certbot python3-certbot-nginx
-```
+1. Update `.env` with the domains (escaping the backticks as shown) and email address that should be used for ACME:
+   ```ini
+   TRAEFIK_ACME_EMAIL=admin@example.com
+   TRAEFIK_HOST_RULE="Host(\`chat.example.com\`) || Host(\`signaling.example.com\`)"
+   ```
+   Adjust the host rule expression to include every hostname that should share this certificate. The default value in `.env.example` matches the sample domains in `nginx.conf`.
 
-2. Obtain SSL certificates for your domains:
-```bash
-sudo certbot --nginx -d <domain>
-```
+2. Ensure the DNS A/AAAA records for those domains point to your server's public IP and that ports 80/443 are open.
 
-3. Certbot will automatically modify your Nginx configuration and set up automatic renewal.
+3. Bring the stack up as usual (the helper script works unchanged). If your Docker host exposes a newer API version (24.x+), the compose file already pins `DOCKER_API_VERSION=1.44` for Traefik so it can talk to modern daemons via the socket:
+   ```bash
+   ./scripts/start-with-turn.sh up -d
+   ```
 
-4. Test the automatic renewal:
-```bash
-sudo certbot renew --dry-run
-```
+Traefik performs the HTTP-01 challenge on port 80, stores certificate material inside the persistent `traefik-acme` Docker volume, and renews certificates automatically ~30 days before expiry. No host-level Certbot installation or cron jobs are required.
 
-5. The certificates will be automatically renewed every 90 days. You can verify the renewal schedule:
-```bash
-sudo certbot certificates
-```
-
-After setting up SSL certificates, your application will be available at:
-- Client: `https://domain`
-- Signaling Server: `https://domain:3001`
-- TURN Server: `turns:domain:5349`
+Nginx inside the `client` container only serves HTTP and proxies `/socket.io/` to the signaling server; Traefik handles HTTPS termination and HTTP→HTTPS redirection.
 
 ### TURN Server
 
