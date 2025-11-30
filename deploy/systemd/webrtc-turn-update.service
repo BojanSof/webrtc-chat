@@ -1,6 +1,6 @@
 [Unit]
 Description=Refresh TURN server with latest DDNS IP
-WorkingDirectory=/home/bojan/webrtc-chat
+WorkingDirectory=/home/user/webrtc-chat
 
 [Service]
 Type=oneshot

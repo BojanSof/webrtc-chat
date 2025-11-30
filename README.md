@@ -188,7 +188,7 @@ If your public IP changes frequently, use a systemd timer to rerun the helper sc
    ```bash
    sudo cp deploy/systemd/webrtc-turn-update.* /etc/systemd/system/
    ```
-2. Edit `/etc/systemd/system/webrtc-turn-update.service` if your repository path differs from `/home/bojan/webrtc-chat`.
+2. Edit `/etc/systemd/system/webrtc-turn-update.service` with the correct repository path (ex. `/home/<user>/webrtc-chat`.
 3. Reload systemd and enable the timer:
    ```bash
    sudo systemctl daemon-reload
