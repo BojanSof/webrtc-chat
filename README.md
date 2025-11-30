@@ -43,6 +43,7 @@ cd webrtc-chat
 ```bash
 cp .env.example .env
 ```
+- For local development, make sure `REACT_APP_SIGNALING_URL` points to your Node signaling server (typically `http://localhost:3001`).
 
 3. Install dependencies:
 ```bash

@@ -25,6 +25,10 @@ import { ICE_SERVERS } from '../utils/webrtcConfig';
 const CHUNK_SIZE = 16 * 1024; // 16KB chunks
 const MAX_ICE_RESTART_ATTEMPTS = 3;
 const ICE_RESTART_COOLDOWN_MS = 3000;
+const SIGNALING_URL =
+  process.env.REACT_APP_SIGNALING_URL?.trim() || '';
+const SIGNALING_PATH =
+  process.env.REACT_APP_SIGNALING_PATH?.trim() || '/socket.io/';
 
 function ChatRoom() {
   const { roomId } = useParams();
@@ -82,14 +86,20 @@ function ChatRoom() {
   }, [status, connectionAttempt]);
 
   const initializeSocket = () => {
-    socketRef.current = io('/', {
-      path: '/socket.io/',
+    const endpoint = SIGNALING_URL || undefined;
+    const isSecure = SIGNALING_URL
+      ? SIGNALING_URL.startsWith('https')
+      : window.location.protocol === 'https:';
+
+    socketRef.current = io(endpoint, {
+      path: SIGNALING_PATH,
       withCredentials: true,
-      secure: true,
+      secure: isSecure,
       reconnection: true,
       reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: RECONNECT_DELAY,
-      timeout: 10000
+      timeout: 10000,
+      transports: ['websocket', 'polling'],
     });
 
     socketRef.current.on('connect', () => {
