@@ -1,6 +1,6 @@
 <center>
 <img src="icon.png" width=128/>
-<h1>WebRTC Chat Application</h1>
+<h1>Chatrix - WebRTC Chat Application</h1>
 </center>
 
 A real-time chat application built with React and WebRTC, featuring text messaging and file sharing capabilities.
