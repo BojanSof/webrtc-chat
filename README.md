@@ -145,16 +145,16 @@ The application will be available at:
 
 Traefik now terminates TLS for the stack and obtains/renews Let's Encrypt certificates automatically. To enable HTTPS:
 
-1. Update `.env` with the domains and email address that should be used for ACME:
+1. Update `.env` with the domains (escaping the backticks as shown) and email address that should be used for ACME:
    ```ini
    TRAEFIK_ACME_EMAIL=admin@example.com
-   TRAEFIK_HOST_RULE=Host(`chat.example.com`) || Host(`signaling.example.com`)
+   TRAEFIK_HOST_RULE="Host(\`chat.example.com\`) || Host(\`signaling.example.com\`)"
    ```
    Adjust the host rule expression to include every hostname that should share this certificate. The default value in `.env.example` matches the sample domains in `nginx.conf`.
 
 2. Ensure the DNS A/AAAA records for those domains point to your server's public IP and that ports 80/443 are open.
 
-3. Bring the stack up as usual (the helper script works unchanged):
+3. Bring the stack up as usual (the helper script works unchanged). If your Docker host exposes a newer API version (24.x+), the compose file already pins `DOCKER_API_VERSION=1.44` for Traefik so it can talk to modern daemons via the socket:
    ```bash
    ./scripts/start-with-turn.sh up -d
    ```
