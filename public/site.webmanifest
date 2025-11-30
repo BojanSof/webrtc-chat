@@ -1,6 +1,6 @@
 {
-    "short_name": "WebRTC Chat",
-    "name": "WebRTC Chat Application",
+    "short_name": "Chatrix",
+    "name": "Chatrix - WebRTC Chat Application",
     "icons": [
         {
             "src": "/android-chrome-192x192.png",

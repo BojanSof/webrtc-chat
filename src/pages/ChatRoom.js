@@ -21,10 +21,15 @@ import {
   clearTransfers,
 } from '../store/slices/fileTransferSlice';
 import { ICE_SERVERS } from '../utils/webrtcConfig';
+import ThemeToggle from '../components/ThemeToggle';
 
 const CHUNK_SIZE = 16 * 1024; // 16KB chunks
 const MAX_ICE_RESTART_ATTEMPTS = 3;
 const ICE_RESTART_COOLDOWN_MS = 3000;
+const SIGNALING_URL =
+  process.env.REACT_APP_SIGNALING_URL?.trim() || '';
+const SIGNALING_PATH =
+  process.env.REACT_APP_SIGNALING_PATH?.trim() || '/socket.io/';
 
 function ChatRoom() {
   const { roomId } = useParams();
@@ -34,6 +39,7 @@ function ChatRoom() {
   const peerConnectionRef = useRef();
   const dataChannelRef = useRef();
   const fileInputRef = useRef();
+  const dragCounterRef = useRef(0);
   const iceRestartAttemptsRef = useRef(0);
   const lastIceRestartRef = useRef(0);
   const [message, setMessage] = useState('');
@@ -45,6 +51,8 @@ function ChatRoom() {
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [receivedFiles, setReceivedFiles] = useState({});
   const [completedFiles, setCompletedFiles] = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const MAX_RECONNECT_ATTEMPTS = 3;
   const RECONNECT_DELAY = 2000; // milliseconds
 
@@ -79,14 +87,20 @@ function ChatRoom() {
   }, [status, connectionAttempt]);
 
   const initializeSocket = () => {
-    socketRef.current = io('/', {
-      path: '/socket.io/',
+    const endpoint = SIGNALING_URL || undefined;
+    const isSecure = SIGNALING_URL
+      ? SIGNALING_URL.startsWith('https')
+      : window.location.protocol === 'https:';
+
+    socketRef.current = io(endpoint, {
+      path: SIGNALING_PATH,
       withCredentials: true,
-      secure: true,
+      secure: isSecure,
       reconnection: true,
       reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: RECONNECT_DELAY,
-      timeout: 10000
+      timeout: 10000,
+      transports: ['websocket', 'polling'],
     });
 
     socketRef.current.on('connect', () => {
@@ -180,6 +194,48 @@ function ChatRoom() {
         roomId,
         from: socketRef.current.id,
       });
+    }
+  };
+
+  const handleDragEnter = (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+    event.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDraggingFile(true);
+  };
+
+  const handleDragOver = (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+    event.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDrop = async (event) => {
+    if (!event.dataTransfer?.files?.length) {
+      return;
+    }
+    event.preventDefault();
+    setIsDraggingFile(false);
+    dragCounterRef.current = 0;
+    const files = Array.from(event.dataTransfer.files);
+    for (const file of files) {
+      // eslint-disable-next-line no-await-in-loop
+      await sendFile(file);
     }
   };
 
@@ -604,31 +660,34 @@ function ChatRoom() {
     }
   };
 
-  const handleFileSelect = async (e) => {
-    const file = e.target.files[0];
+  const sendFile = async (file) => {
     if (!file || !dataChannelRef.current || !isDataChannelReady) {
-      console.log('Cannot send file:', { file, dataChannel: !!dataChannelRef.current, ready: isDataChannelReady });
+      console.log('Cannot send file:', {
+        file,
+        dataChannel: !!dataChannelRef.current,
+        ready: isDataChannelReady,
+      });
       return;
     }
 
+    const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const chunkSize = CHUNK_SIZE;
+    const totalChunks = Math.ceil(file.size / chunkSize);
+
     try {
-      const fileId = Date.now().toString();
-      const chunkSize = CHUNK_SIZE;
-      const totalChunks = Math.ceil(file.size / chunkSize);
+      dispatch(
+        addMessage({
+          id: fileId,
+          type: 'file',
+          fileName: file.name,
+          size: file.size,
+          sender: 'local',
+          status: 'sending',
+          progress: 0,
+          fileType: file.type,
+        })
+      );
 
-      // Add file as a message immediately
-      dispatch(addMessage({
-        id: fileId,
-        type: 'file',
-        fileName: file.name,
-        size: file.size,
-        sender: 'local',
-        status: 'sending',
-        progress: 0,
-        fileType: file.type
-      }));
-
-      // Send file start message
       dataChannelRef.current.send(
         JSON.stringify({
           type: 'file',
@@ -641,25 +700,30 @@ function ChatRoom() {
         })
       );
 
-      // Send file chunks with flow control
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
         const start = chunkIndex * chunkSize;
         const end = Math.min(start + chunkSize, file.size);
         const chunk = file.slice(start, end);
 
         const reader = new FileReader();
+        // eslint-disable-next-line no-await-in-loop
         await new Promise((resolve, reject) => {
           reader.onload = async () => {
             try {
-              // Convert the ArrayBuffer to base64 for transmission
-              const base64Data = btoa(String.fromCharCode.apply(null, new Uint8Array(reader.result)));
-              
-              // Wait for the data channel to be ready to send
-              while (dataChannelRef.current.bufferedAmount > dataChannelRef.current.bufferedAmountLowThreshold) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+              const base64Data = btoa(
+                String.fromCharCode.apply(null, new Uint8Array(reader.result))
+              );
+
+              // eslint-disable-next-line no-await-in-loop
+              while (
+                dataChannelRef.current.bufferedAmount >
+                dataChannelRef.current.bufferedAmountLowThreshold
+              ) {
+                await new Promise((innerResolve) =>
+                  setTimeout(innerResolve, 100)
+                );
               }
 
-              // Send the chunk
               dataChannelRef.current.send(
                 JSON.stringify({
                   type: 'file',
@@ -672,16 +736,18 @@ function ChatRoom() {
               );
 
               const progress = ((chunkIndex + 1) / totalChunks) * 100;
-              dispatch(addMessage({
-                id: fileId,
-                type: 'file',
-                fileName: file.name,
-                size: file.size,
-                sender: 'local',
-                status: 'sending',
-                progress,
-                fileType: file.type
-              }));
+              dispatch(
+                addMessage({
+                  id: fileId,
+                  type: 'file',
+                  fileName: file.name,
+                  size: file.size,
+                  sender: 'local',
+                  status: 'sending',
+                  progress,
+                  fileType: file.type,
+                })
+              );
               resolve();
             } catch (error) {
               reject(error);
@@ -692,7 +758,6 @@ function ChatRoom() {
         });
       }
 
-      // Send file complete message
       dataChannelRef.current.send(
         JSON.stringify({
           type: 'file',
@@ -701,40 +766,53 @@ function ChatRoom() {
         })
       );
 
-      // Create a copy of the file for local download
       const fileCopy = new File([file], file.name, { type: file.type });
       const localUrl = URL.createObjectURL(fileCopy);
 
-      // Update message status to complete
-      dispatch(addMessage({
-        id: fileId,
-        type: 'file',
-        fileName: file.name,
-        size: file.size,
-        sender: 'local',
-        status: 'complete',
-        progress: 100,
-        url: localUrl,
-        fileType: file.type
-      }));
+      dispatch(
+        addMessage({
+          id: fileId,
+          type: 'file',
+          fileName: file.name,
+          size: file.size,
+          sender: 'local',
+          status: 'complete',
+          progress: 100,
+          url: localUrl,
+          fileType: file.type,
+        })
+      );
 
       console.log('File transfer completed successfully');
     } catch (error) {
       console.error('Error during file transfer:', error);
-      dispatch(failTransfer({ fileId: Date.now().toString() }));
+      dispatch(failTransfer({ fileId }));
     }
+  };
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    for (const file of files) {
+      // eslint-disable-next-line no-await-in-loop
+      await sendFile(file);
+    }
+    e.target.value = '';
+  };
+
+  const triggerDownload = (url, fileName) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleDownload = (fileId) => {
     const message = messages.find(msg => msg.id === fileId);
     if (!message || !message.url) return;
 
-    const a = document.createElement('a');
-    a.href = message.url;
-    a.download = message.fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    triggerDownload(message.url, message.fileName);
   };
 
   const cleanup = () => {
@@ -749,9 +827,19 @@ function ChatRoom() {
     }
     dispatch(resetConnection());
     dispatch(clearTransfers());
+    dispatch(clearMessages());
+    dispatch(setRemoteTyping(false));
     setIsDataChannelReady(false);
     setIsHandlingOffer(false);
+    setMessage('');
+    setIsDraggingFile(false);
+    setPreviewImage(null);
     resetIceRestartState();
+  };
+
+  const handleLeaveRoom = () => {
+    cleanup();
+    navigate('/');
   };
 
   // Add a function to handle page visibility changes
@@ -779,31 +867,48 @@ function ChatRoom() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      <div className="flex-shrink-0 bg-white shadow absolute top-0 left-0 right-0 z-10">
+    <div
+      className="flex flex-col h-screen bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingFile && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-black/60">
+          <div className="rounded-xl border-2 border-dashed border-white px-8 py-6 text-center text-white shadow-lg">
+            <p className="text-xl font-semibold">Drop files to send</p>
+            <p className="text-sm text-white/80">Release to start transfer</p>
+          </div>
+        </div>
+      )}
+      <div className="flex-shrink-0 bg-white shadow absolute top-0 left-0 right-0 z-10 dark:bg-gray-800 dark:shadow-black/40">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
-            <h1 className="text-xl font-semibold text-gray-900">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
               Room: {roomId}
             </h1>
             <span
               className={`ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
                 status === 'connected'
-                  ? 'bg-green-100 text-green-800'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                   : status === 'connecting'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
+                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
               }`}
             >
               {status}
             </span>
           </div>
-          <button
-            onClick={() => navigate('/')}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            Leave Room
-          </button>
+          <div className="flex items-center gap-3">
+            <ThemeToggle className="bg-gray-200/80 text-gray-700 shadow-none hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600" />
+            <button
+              onClick={handleLeaveRoom}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
+            >
+              Leave Room
+            </button>
+          </div>
         </div>
       </div>
 
@@ -818,10 +923,10 @@ function ChatRoom() {
                 }`}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg break-words whitespace-pre-wrap transition-colors ${
                     msg.sender === 'local'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-white text-gray-900'
+                      ? 'bg-primary-600 text-white dark:bg-primary-500'
+                      : 'bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-100'
                   }`}
                 >
                   {msg.type === 'file' ? (
@@ -843,41 +948,78 @@ function ChatRoom() {
                           />
                         </svg>
                         <div className="flex flex-col">
-                          <span className={`font-medium ${
-                            msg.sender === 'local' ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <span
+                            className={`font-medium break-words ${
+                              msg.sender === 'local'
+                                ? 'text-white'
+                                : 'text-gray-900 dark:text-gray-100'
+                            }`}
+                          >
                             {msg.fileName}
                           </span>
-                          <span className={`text-sm ${
-                            msg.sender === 'local' ? 'text-gray-200' : 'text-gray-500'
-                          }`}>
+                          <span
+                            className={`text-sm ${
+                              msg.sender === 'local'
+                                ? 'text-gray-200'
+                                : 'text-gray-500 dark:text-gray-300'
+                            }`}
+                          >
                             {formatFileSize(msg.size || 0)}
                           </span>
                           {msg.status === 'sending' && (
-                            <span className={`text-sm ${
-                              msg.sender === 'local' ? 'text-gray-200' : 'text-gray-500'
-                            }`}>
+                            <span
+                              className={`text-sm ${
+                                msg.sender === 'local'
+                                  ? 'text-gray-200'
+                                  : 'text-gray-500 dark:text-gray-300'
+                              }`}
+                            >
                               Sending... {Math.round(msg.progress || 0)}%
                             </span>
                           )}
                           {msg.status === 'receiving' && (
-                            <span className={`text-sm ${
-                              msg.sender === 'local' ? 'text-gray-200' : 'text-gray-500'
-                            }`}>
+                            <span
+                              className={`text-sm ${
+                                msg.sender === 'local'
+                                  ? 'text-gray-200'
+                                  : 'text-gray-500 dark:text-gray-300'
+                              }`}
+                            >
                               Receiving... {Math.round(msg.progress || 0)}%
                             </span>
                           )}
                         </div>
                       </div>
-                      {msg.status === 'complete' && (
-                        <button
-                          onClick={() => handleDownload(msg.id)}
-                          className={`mt-2 text-sm flex items-center space-x-1 ${
-                            msg.sender === 'local'
-                              ? 'text-white hover:text-gray-200'
-                              : 'text-primary-600 hover:text-primary-800'
-                          }`}
-                        >
+                          {msg.status === 'complete' && msg.url && msg.fileType?.startsWith('image/') && (
+                            <div
+                              className={`mt-3 rounded-lg overflow-hidden ${
+                                msg.sender === 'local'
+                                  ? 'bg-white/10 dark:bg-white/20'
+                                  : 'bg-gray-100 dark:bg-gray-700'
+                              }`}
+                            >
+                              <img
+                                src={msg.url}
+                                alt={msg.fileName}
+                                className="max-h-64 w-full object-contain cursor-pointer bg-white"
+                                onClick={() =>
+                                  setPreviewImage({
+                                    url: msg.url,
+                                    name: msg.fileName,
+                                  })
+                                }
+                              />
+                            </div>
+                          )}
+                          {msg.status === 'complete' && (
+                            <button
+                              onClick={() => handleDownload(msg.id)}
+                              className={`mt-2 text-sm flex items-center space-x-1 ${
+                                msg.sender === 'local'
+                                  ? 'text-white hover:text-gray-200'
+                                  : 'text-primary-600 hover:text-primary-800 dark:text-primary-300 dark:hover:text-primary-200'
+                              }`}
+                            >
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -896,7 +1038,9 @@ function ChatRoom() {
                       )}
                     </div>
                   ) : (
-                    <span>{msg.text}</span>
+                    <span className="break-words whitespace-pre-wrap">
+                      {msg.text}
+                    </span>
                   )}
                 </div>
               </div>
@@ -904,7 +1048,7 @@ function ChatRoom() {
             
             {remoteTyping && (
               <div className="flex justify-start">
-                <div className="bg-white text-gray-500 px-4 py-2 rounded-lg">
+                <div className="bg-white text-gray-500 px-4 py-2 rounded-lg dark:bg-gray-800 dark:text-gray-300">
                   Typing...
                 </div>
               </div>
@@ -912,7 +1056,7 @@ function ChatRoom() {
           </div>
         </div>
 
-        <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4">
+        <div className="flex-shrink-0 bg-white border-t border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
           <form onSubmit={(e) => {
             e.preventDefault();
             if (message.trim() && dataChannelRef.current && isDataChannelReady) {
@@ -936,12 +1080,12 @@ function ChatRoom() {
                 handleTyping();
               }}
               placeholder="Type a message..."
-              className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400"
             />
             <button
               type="button"
               onClick={() => fileInputRef.current.click()}
-              className="flex-shrink-0 p-2 text-gray-600 hover:text-gray-800"
+              className="flex-shrink-0 p-2 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100"
             >
               <svg
                 className="w-6 h-6"
@@ -972,6 +1116,44 @@ function ChatRoom() {
           </form>
         </div>
       </div>
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-h-full max-w-4xl w-full bg-white rounded-lg shadow-xl p-4 dark:bg-gray-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-3 right-3 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+              onClick={() => setPreviewImage(null)}
+              aria-label="Close preview"
+            >
+              ✕
+            </button>
+            <div className="flex flex-col space-y-3">
+              <span className="text-sm font-medium text-gray-700 break-words dark:text-gray-200">
+                {previewImage.name}
+              </span>
+              <img
+                src={previewImage.url}
+                alt={previewImage.name}
+                className="max-h-[70vh] w-full object-contain rounded-md bg-gray-100 dark:bg-gray-800"
+              />
+              <button
+                onClick={() =>
+                  triggerDownload(previewImage.url, previewImage.name)
+                }
+                className="self-start text-primary-600 hover:text-primary-800 text-sm dark:text-primary-300 dark:hover:text-primary-200"
+              >
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
