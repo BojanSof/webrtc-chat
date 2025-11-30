@@ -34,6 +34,7 @@ function ChatRoom() {
   const peerConnectionRef = useRef();
   const dataChannelRef = useRef();
   const fileInputRef = useRef();
+  const dragCounterRef = useRef(0);
   const iceRestartAttemptsRef = useRef(0);
   const lastIceRestartRef = useRef(0);
   const [message, setMessage] = useState('');
@@ -45,6 +46,8 @@ function ChatRoom() {
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [receivedFiles, setReceivedFiles] = useState({});
   const [completedFiles, setCompletedFiles] = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const MAX_RECONNECT_ATTEMPTS = 3;
   const RECONNECT_DELAY = 2000; // milliseconds
 
@@ -53,7 +56,6 @@ function ChatRoom() {
   const { activeTransfers, completedTransfers } = useSelector(
     (state) => state.fileTransfer
   );
-  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     dispatch(setRoomId(roomId));
@@ -181,6 +183,48 @@ function ChatRoom() {
         roomId,
         from: socketRef.current.id,
       });
+    }
+  };
+
+  const handleDragEnter = (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+    event.preventDefault();
+    dragCounterRef.current += 1;
+    setIsDraggingFile(true);
+  };
+
+  const handleDragOver = (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) {
+      return;
+    }
+    event.preventDefault();
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDrop = async (event) => {
+    if (!event.dataTransfer?.files?.length) {
+      return;
+    }
+    event.preventDefault();
+    setIsDraggingFile(false);
+    dragCounterRef.current = 0;
+    const files = Array.from(event.dataTransfer.files);
+    for (const file of files) {
+      // eslint-disable-next-line no-await-in-loop
+      await sendFile(file);
     }
   };
 
@@ -605,31 +649,34 @@ function ChatRoom() {
     }
   };
 
-  const handleFileSelect = async (e) => {
-    const file = e.target.files[0];
+  const sendFile = async (file) => {
     if (!file || !dataChannelRef.current || !isDataChannelReady) {
-      console.log('Cannot send file:', { file, dataChannel: !!dataChannelRef.current, ready: isDataChannelReady });
+      console.log('Cannot send file:', {
+        file,
+        dataChannel: !!dataChannelRef.current,
+        ready: isDataChannelReady,
+      });
       return;
     }
 
+    const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const chunkSize = CHUNK_SIZE;
+    const totalChunks = Math.ceil(file.size / chunkSize);
+
     try {
-      const fileId = Date.now().toString();
-      const chunkSize = CHUNK_SIZE;
-      const totalChunks = Math.ceil(file.size / chunkSize);
+      dispatch(
+        addMessage({
+          id: fileId,
+          type: 'file',
+          fileName: file.name,
+          size: file.size,
+          sender: 'local',
+          status: 'sending',
+          progress: 0,
+          fileType: file.type,
+        })
+      );
 
-      // Add file as a message immediately
-      dispatch(addMessage({
-        id: fileId,
-        type: 'file',
-        fileName: file.name,
-        size: file.size,
-        sender: 'local',
-        status: 'sending',
-        progress: 0,
-        fileType: file.type
-      }));
-
-      // Send file start message
       dataChannelRef.current.send(
         JSON.stringify({
           type: 'file',
@@ -642,25 +689,30 @@ function ChatRoom() {
         })
       );
 
-      // Send file chunks with flow control
       for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
         const start = chunkIndex * chunkSize;
         const end = Math.min(start + chunkSize, file.size);
         const chunk = file.slice(start, end);
 
         const reader = new FileReader();
+        // eslint-disable-next-line no-await-in-loop
         await new Promise((resolve, reject) => {
           reader.onload = async () => {
             try {
-              // Convert the ArrayBuffer to base64 for transmission
-              const base64Data = btoa(String.fromCharCode.apply(null, new Uint8Array(reader.result)));
-              
-              // Wait for the data channel to be ready to send
-              while (dataChannelRef.current.bufferedAmount > dataChannelRef.current.bufferedAmountLowThreshold) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+              const base64Data = btoa(
+                String.fromCharCode.apply(null, new Uint8Array(reader.result))
+              );
+
+              // eslint-disable-next-line no-await-in-loop
+              while (
+                dataChannelRef.current.bufferedAmount >
+                dataChannelRef.current.bufferedAmountLowThreshold
+              ) {
+                await new Promise((innerResolve) =>
+                  setTimeout(innerResolve, 100)
+                );
               }
 
-              // Send the chunk
               dataChannelRef.current.send(
                 JSON.stringify({
                   type: 'file',
@@ -673,16 +725,18 @@ function ChatRoom() {
               );
 
               const progress = ((chunkIndex + 1) / totalChunks) * 100;
-              dispatch(addMessage({
-                id: fileId,
-                type: 'file',
-                fileName: file.name,
-                size: file.size,
-                sender: 'local',
-                status: 'sending',
-                progress,
-                fileType: file.type
-              }));
+              dispatch(
+                addMessage({
+                  id: fileId,
+                  type: 'file',
+                  fileName: file.name,
+                  size: file.size,
+                  sender: 'local',
+                  status: 'sending',
+                  progress,
+                  fileType: file.type,
+                })
+              );
               resolve();
             } catch (error) {
               reject(error);
@@ -693,7 +747,6 @@ function ChatRoom() {
         });
       }
 
-      // Send file complete message
       dataChannelRef.current.send(
         JSON.stringify({
           type: 'file',
@@ -702,28 +755,37 @@ function ChatRoom() {
         })
       );
 
-      // Create a copy of the file for local download
       const fileCopy = new File([file], file.name, { type: file.type });
       const localUrl = URL.createObjectURL(fileCopy);
 
-      // Update message status to complete
-      dispatch(addMessage({
-        id: fileId,
-        type: 'file',
-        fileName: file.name,
-        size: file.size,
-        sender: 'local',
-        status: 'complete',
-        progress: 100,
-        url: localUrl,
-        fileType: file.type
-      }));
+      dispatch(
+        addMessage({
+          id: fileId,
+          type: 'file',
+          fileName: file.name,
+          size: file.size,
+          sender: 'local',
+          status: 'complete',
+          progress: 100,
+          url: localUrl,
+          fileType: file.type,
+        })
+      );
 
       console.log('File transfer completed successfully');
     } catch (error) {
       console.error('Error during file transfer:', error);
-      dispatch(failTransfer({ fileId: Date.now().toString() }));
+      dispatch(failTransfer({ fileId }));
     }
+  };
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    for (const file of files) {
+      // eslint-disable-next-line no-await-in-loop
+      await sendFile(file);
+    }
+    e.target.value = '';
   };
 
   const triggerDownload = (url, fileName) => {
@@ -784,7 +846,21 @@ function ChatRoom() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
+    <div
+      className="flex flex-col h-screen bg-gray-100"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDraggingFile && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-black/60">
+          <div className="rounded-xl border-2 border-dashed border-white px-8 py-6 text-center text-white shadow-lg">
+            <p className="text-xl font-semibold">Drop files to send</p>
+            <p className="text-sm text-white/80">Release to start transfer</p>
+          </div>
+        </div>
+      )}
       <div className="flex-shrink-0 bg-white shadow absolute top-0 left-0 right-0 z-10">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center">
